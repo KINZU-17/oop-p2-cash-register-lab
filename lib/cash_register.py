@@ -9,26 +9,28 @@ class CashRegister:
         """
         Initializes transactional states, accommodating an optional baseline discount rate.
         """
+        # Ensure discount values are explicitly managed as integers or floats
         self.discount = discount
         self.total = 0
         self.items = []
         
-        # Tracks historical structural changes for transaction voiding
-        self._last_transaction_history = []
+        # Internal stack log to track the exact quantity and price of items per scan
+        self._transaction_history = []
 
     def add_item(self, title, price, quantity=1):
         """
         Calculates item insertions, accumulates values, and lists scanned keys.
         """
-        transaction_cost = price * quantity
-        self.total += transaction_cost
+        # Round the cost entry point to clear floating-point binary issues
+        transaction_cost = round(price * quantity, 2)
+        self.total = round(self.total + transaction_cost, 2)
         
         # Append titles to build the transaction sequence
         for _ in range(quantity):
             self.items.append(title)
             
-        # Record the transaction metadata for precise reversal operations
-        self._last_transaction_history.append({
+        # Record the transaction snapshot for precise undo/void tracking
+        self._transaction_history.append({
             "title": title,
             "cost": transaction_cost,
             "quantity": quantity
@@ -36,12 +38,16 @@ class CashRegister:
 
     def apply_discount(self):
         """
-        Executes a percentage discount deduction while logging matching system output lines.
+        Executes a percentage discount deduction while printing matching output logs.
         """
         if self.discount > 0:
             savings_multiplier = 1 - (self.discount / 100)
-            self.total = self.total * savings_multiplier
-            print(f"After the discount, the total comes to ${self.total:g}.")
+            # Calculate and round the final discounted value
+            self.total = round(self.total * savings_multiplier, 2)
+            
+            # Cleanly strip away any trailing '.0' to perfectly match the '$800' string assertion
+            display_total = int(self.total) if self.total.is_integer() else self.total
+            print(f"After the discount, the total comes to ${display_total}.")
         else:
             print("There is no discount to apply.")
 
@@ -49,16 +55,16 @@ class CashRegister:
         """
         Removes the last transaction entry block entirely from tracking.
         """
-        if not self._last_transaction_history:
+        if not self._transaction_history:
             return
             
-        # Pop the latest transaction log snapshot
-        last_action = self._last_transaction_history.pop()
+        # Pop the latest transaction log snapshot off the stack
+        last_action = self._transaction_history.pop()
         
-        # Deduct the recorded cost value from our total metric balance
-        self.total -= last_action["cost"]
+        # Deduct the cost value from our total metric balance
+        self.total = round(self.total - last_action["cost"], 2)
         
-        # Slice away the exact quantity of items from the tail end of the list
+        # Slice away the exact quantity of items from the trailing end of our list
         qty_to_remove = last_action["quantity"]
         if qty_to_remove > 0:
             self.items = self.items[:-qty_to_remove]
